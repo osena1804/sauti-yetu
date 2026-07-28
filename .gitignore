@@ -1,0 +1,9 @@
+venv/
+__pycache__/
+*.pyc
+.env
+data/complaints.csv
+data/_tmp_*
+.streamlit/secrets.toml
+*.log
+data/resolved_*.jpg
