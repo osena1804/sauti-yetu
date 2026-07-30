@@ -20,7 +20,13 @@ st.set_page_config(page_title="Sauti-Yetu", page_icon="📣", layout="wide")
 st.title("📣 Sauti-Yetu")
 st.caption("Voice of the People — turning citizen complaints into constituency action, powered by Gemma 4.")
 
-tab_public, tab_admin, tab_submit = st.tabs(["🌍 Public Portal", "🏛️ Admin Portal", "📝 Submit a Report"])
+is_admin = st.query_params.get("admin", "false") == "true"
+
+if is_admin:
+    tab_public, tab_admin, tab_submit = st.tabs(["🌍 Public Portal", "🏛️ Admin Portal", "📝 Submit a Report"])
+else:
+    tab_public, tab_submit = st.tabs(["🌍 Public Portal", "📝 Submit a Report"])
+    tab_admin = None
 
 # ---------------------------------------------------------------------------
 # SUBMIT TAB -- chat-style input: text, mic, or photo
@@ -160,9 +166,10 @@ with tab_public:
 # ---------------------------------------------------------------------------
 # ADMIN PORTAL -- gap detector + one-click CDF draft generator
 # ---------------------------------------------------------------------------
-with tab_admin:
-    st.subheader("Administrator tools")
-    df = ds.load_complaints()
+if tab_admin is not None:
+    with tab_admin:
+        st.subheader("Administrator tools")
+        df = ds.load_complaints()
 
     if df.empty:
         st.info("No reports yet.")
