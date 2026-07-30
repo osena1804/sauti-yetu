@@ -22,7 +22,7 @@ GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 GEMMA_MODEL = os.getenv("GEMMA_MODEL", "gemma-4-it")
 FORCE_MOCK = os.getenv("FORCE_MOCK", "0") == "1"
 
-CATEGORIES = ["Infrastructure", "Water", "Health", "Education", "Security", "Environment", "Other"]
+CATEGORIES = ["Infrastructure", "Water", "Health", "Education", "Security", "Environment", "Employment", "Other"]
 URGENCY_LEVELS = ["High", "Medium", "Low"]
 
 SYSTEM_PROMPT = """You are a civic-complaint structuring engine for a Kenyan constituency
@@ -127,6 +127,8 @@ def _mock_classify(raw_text: str) -> dict:
         category = "Security"
     elif any(w in text_lower for w in ["taka", "uchafu", "dump", "pollution", "moshi", "air quality"]):
         category = "Environment"
+    elif any(w in text_lower for w in ["unemployment", "jobless", "employment", "job opportunities", "business"]):
+        category = "Employment"
     else:
         category = "Other"
 

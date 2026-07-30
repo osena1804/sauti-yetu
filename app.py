@@ -13,6 +13,7 @@ import pandas as pd
 
 import gemma_client as gc
 import data_store as ds
+import sms_client as sms
 
 st.set_page_config(page_title="Sauti-Yetu", page_icon="📣", layout="wide")
 
@@ -223,5 +224,16 @@ with tab_admin:
                         chosen_id, resolution_note.strip(), resolved_by.strip(),
                         photo_path, resolved_date.strftime("%Y-%m-%d"),
                     )
-                    st.success(f"Marked resolved by {resolved_by.strip()} on {resolved_row['resolved_date']}.")
+                    sms_sent = sms.send_resolution_alert(
+                        resolved_row.get("phone", ""),
+                        resolved_row["category"],
+                        resolved_row["ward"],
+                    )
+                    if resolved_row.get("phone"):
+                        if sms_sent:
+                            st.success(f"Marked resolved by {resolved_by.strip()} on {resolved_row['resolved_date']}. SMS alert sent.")
+                        else:
+                            st.success(f"Marked resolved by {resolved_by.strip()} on {resolved_row['resolved_date']}. (SMS mocked — check terminal.)")
+                    else:
+                        st.success(f"Marked resolved by {resolved_by.strip()} on {resolved_row['resolved_date']}. No phone on file, no SMS sent.")
                     st.rerun()
