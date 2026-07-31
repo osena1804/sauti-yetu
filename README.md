@@ -84,7 +84,7 @@ sauti-yetu/
   speech-to-text or vision service.
 - **Generation** drafts the formal NG-CDF proposal text from structured complaint clusters.
 
-See https://www.kaggle.com/competitions/build-with-gemma-gdg-pwani/writeups for full architecture rationale, challenges, and technical tradeoffs.
+See kaggle.com/competitions/build-with-gemma-gdg-pwani/writeups/sauti-yetu for full architecture rationale, challenges, and technical tradeoffs.
 
 ## Known Limitations (by design, for a fast build)
 
