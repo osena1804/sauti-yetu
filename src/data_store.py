@@ -60,7 +60,8 @@ def load_complaints() -> pd.DataFrame:
         return df
 
     df = _coerce_dtypes(df)
-    df["timestamp"] = pd.to_datetime(df["timestamp"], utc=True, format="ISO8601")    
+    df["timestamp"] = pd.to_datetime(df["timestamp"], utc=True, format="ISO8601")
+    df["timestamp"] = df["timestamp"].fillna(pd.Timestamp.now(tz="UTC"))
     now = datetime.now(timezone.utc)
     df["days_unresolved"] = (now - df["timestamp"]).dt.days
     df.to_csv(DATA_PATH, index=False)  # persist any backfilled columns/ids

@@ -15,6 +15,11 @@ import gemma_client as gc
 import data_store as ds
 import sms_client as sms
 
+if gc.FORCE_MOCK or not gc.GOOGLE_API_KEY:
+    st.sidebar.warning("⚠️ Running in MOCK mode — no live Gemma 4 connection")
+else:
+    st.sidebar.success("✅ Live Gemma 4 connected")
+
 st.set_page_config(page_title="Sauti-Yetu", page_icon="📣", layout="wide")
 
 st.title("📣 Sauti-Yetu")

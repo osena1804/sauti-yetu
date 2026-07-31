@@ -203,7 +203,11 @@ def classify_complaint(raw_text: str) -> dict:
 def classify_complaint_audio(audio_path: str) -> dict:
     client = _get_client()
     if client is None:
-        return _mock_classify("[audio input -- mock mode has no transcription]")
+        result = _mock_classify("Voice report submitted. Full transcript requires a live Gemma 4 API key (currently offline/mock mode).")
+        result["timestamp"] = datetime.now(timezone.utc).isoformat()
+        result["raw_text"] = f"[voice note: {os.path.basename(audio_path)}]"
+        result["days_unresolved"] = 0
+        return result
 
     try:
         from google.genai import types
@@ -244,7 +248,11 @@ def classify_complaint_image(image_path: str) -> dict:
     """
     client = _get_client()
     if client is None:
-        return _mock_classify("[photo input -- mock mode has no image understanding]")
+        result = _mock_classify("Photo report submitted. Image understanding requires a live Gemma 4 API key (currently offline/mock mode).")
+        result["timestamp"] = datetime.now(timezone.utc).isoformat()
+        result["raw_text"] = f"[photo report: {os.path.basename(image_path)}]"
+        result["days_unresolved"] = 0
+        return result
 
     try:
         from google.genai import types
