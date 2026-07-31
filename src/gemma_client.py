@@ -85,6 +85,21 @@ _TRANSLATION_HINTS = {
     "limebomoka": "has partially collapsed",
 }
 
+SUBCOUNTIES = ["Changamwe", "Jomvu", "Kisauni", "Nyali", "Likoni", "Mvita"]
+
+WARD_TO_SUBCOUNTY = {
+    "Port Reitz": "Changamwe", "Kipevu": "Changamwe", "Airport": "Changamwe", "Chaani": "Changamwe",
+    "Jomvu Kuu": "Jomvu", "Miritini": "Jomvu", "Mikindani": "Jomvu",
+    "Mjambere": "Kisauni", "Junda": "Kisauni", "Bamburi": "Kisauni", "Mwakirunge": "Kisauni",
+    "Mtopanga": "Kisauni", "Magogoni": "Kisauni", "Shanzu": "Kisauni",
+    "Frere Town": "Nyali", "Ziwa la Ng'ombe": "Nyali", "Mkomani": "Nyali", "Kongowea": "Nyali", "Kadzandani": "Nyali",
+    "Mtongwe": "Likoni", "Shika Adabu": "Likoni", "Bofu": "Likoni", "Timbwani": "Likoni",
+    "Mji wa Kale": "Mvita", "Makadara": "Mvita", "Tudor": "Mvita", "Tononoka": "Mvita",
+    "Majengo": "Mvita", "Ganjoni": "Mvita", "Shimanzi": "Mvita",
+    # Estate aliases map to their nearest official subcounty
+    "Bombolulu": "Kisauni", "Mwembe Tayari": "Mvita", "Old Town": "Mvita",
+    "Maweni": "Kisauni", "Kizingo": "Mvita", "Magongo": "Changamwe",
+}
 
 def _get_client():
     """Lazily create the genai client. Returns None if unavailable -> triggers mock mode."""

@@ -119,24 +119,61 @@ with tab_public:
         if category_filter != "All":
             view = view[view["category"] == category_filter]
 
-        st.markdown("#### ⏱️ Responsiveness Clock")
-        st.caption("Sorted by urgency, then by how long the issue has gone unaddressed.")
+        dash_col, clock_col = st.columns([1, 1])
 
-        import urllib.parse
+        with dash_col:
+            st.markdown("#### 📊 Complaint Hotspots by Subcounty")
 
-        status_badge = {"Open": "", "Resolved": "✅ **Resolved**", "Disputed": "⚠️ **Disputed by community**"}
+            area_view = view.copy()
+            area_view["subcounty"] = area_view["ward"].map(gc.WARD_TO_SUBCOUNTY).fillna("Other")
 
-        for _, row in view.iterrows():
-            urgency_color = {"High": "🔴", "Medium": "🟡", "Low": "🟢"}.get(row["urgency"], "⚪")
-            badge = status_badge.get(row["status"], "")
-
-            st.markdown(
-                f"{urgency_color} **{row['category']}** — {row['ward']} {badge}  \n"
-                f"· *{int(row['days_unresolved'])} days unaddressed*  \n"
-                f"> {row['english_summary']}"
+            subcounty_view_choice = st.selectbox(
+                "Select Subcounty View:",
+                ["All Subcounties (Category Breakdown)"] + sorted(gc.SUBCOUNTIES),
+                key="top_subcounty_view",
             )
 
-            if row["status"] == "Resolved":
+            if subcounty_view_choice == "All Subcounties (Category Breakdown)":
+                subcounty_breakdown = pd.crosstab(area_view["subcounty"], area_view["category"])
+                st.bar_chart(subcounty_breakdown, stack=False)
+            else:
+                filtered_subcounty = area_view[area_view["subcounty"] == subcounty_view_choice]
+                single_subcounty_breakdown = pd.crosstab(filtered_subcounty["subcounty"], filtered_subcounty["category"])
+                st.bar_chart(single_subcounty_breakdown, stack=False)
+
+            st.markdown("###### Narrow down to wards in a subcounty")
+            drill_choice = st.selectbox(
+                "Select a subcounty to see its ward breakdown:",
+                sorted(gc.SUBCOUNTIES),
+                key="ward_subcounty_view",
+            )
+
+            ward_subset = area_view[area_view["subcounty"] == drill_choice]
+            if not ward_subset.empty:
+                st.caption(f"Complaint breakdown by wards: {drill_choice} subcounty")
+                ward_breakdown = pd.crosstab(ward_subset["ward"], ward_subset["category"])
+                st.bar_chart(ward_breakdown, stack=False)
+            else:
+                st.caption(f"No complaints recorded yet in {drill_choice}.")
+
+        with clock_col:
+            st.markdown("#### ⏱️ Responsiveness Clock")
+            st.caption("Sorted by urgency, then by how long the issue has gone unaddressed.")
+
+            import urllib.parse
+            status_badge = {"Open": "", "Resolved": "✅ **Resolved**", "Disputed": "⚠️ **Disputed by community**"}
+
+            for _, row in view.iterrows():
+                urgency_color = {"High": "🔴", "Medium": "🟡", "Low": "🟢"}.get(row["urgency"], "⚪")
+                badge = status_badge.get(row["status"], "")
+
+                st.markdown(
+                    f"{urgency_color} **{row['category']}** — {row['ward']} {badge}  \n"
+                    f"· *{int(row['days_unresolved'])} days unaddressed*  \n"
+                    f"> {row['english_summary']}"
+                )
+
+                if row["status"] == "Resolved":
                     with st.expander("🚩 This isn't actually fixed"):
                         dispute_reason = st.text_area(
                             "Why do you think this isn't resolved?",
@@ -150,18 +187,18 @@ with tab_public:
                             else:
                                 st.warning("Please explain why you're disputing this.")
 
-            if row["status"] in ("Resolved", "Disputed") and row["resolution_note"]:
-                st.caption(f"Resolution claim: {row['resolution_note']} — signed off by {row['resolved_by']} on {row['resolved_date']}")
+                if row["status"] in ("Resolved", "Disputed") and row["resolution_note"]:
+                    st.caption(f"Resolution claim: {row['resolution_note']} — signed off by {row['resolved_by']} on {row['resolved_date']}")
 
-            share_msg = (
-                f"We have been waiting {int(row['days_unresolved'])} days for action on: "
-                f"{row['category']} issue in {row['ward']} ward. "
-                f"Reported via Sauti-Yetu: {row['english_summary']}"
-            )
-            wa_link = f"https://wa.me/?text={urllib.parse.quote(share_msg)}"
-            st.markdown(f"[📤 Share to WhatsApp]({wa_link})")
+                share_msg = (
+                    f"We have been waiting {int(row['days_unresolved'])} days for action on: "
+                    f"{row['category']} issue in {row['ward']} ward. "
+                    f"Reported via Sauti-Yetu: {row['english_summary']}"
+                )
+                wa_link = f"https://wa.me/?text={urllib.parse.quote(share_msg)}"
+                st.markdown(f"[📤 Share to WhatsApp]({wa_link})")
 
-            st.divider()
+                st.divider()
 
 # ---------------------------------------------------------------------------
 # ADMIN PORTAL -- gap detector + one-click CDF draft generator
@@ -171,76 +208,77 @@ if tab_admin is not None:
         st.subheader("Administrator tools")
         df = ds.load_complaints()
 
-    if df.empty:
-        st.info("No reports yet.")
-    else:
-        st.markdown("#### Gap detector — clusters by ward & category")
-        cluster = (
-            df.groupby(["ward", "category"])
-            .agg(count=("category", "size"), max_days_unresolved=("days_unresolved", "max"))
-            .reset_index()
-            .sort_values(by=["count", "max_days_unresolved"], ascending=False)
-        )
-        st.dataframe(cluster, use_container_width=True, hide_index=True)
-
-        st.markdown("#### One-click CDF Draft Generator")
-        wards = sorted(df["ward"].dropna().unique().tolist())
-        chosen_ward = st.selectbox("Select ward cluster to draft a proposal for", wards)
-
-        subset = df[df["ward"] == chosen_ward]
-        st.write(f"{len(subset)} complaint(s) will be used as evidence for this draft.")
-
-        if st.button("📄 Generate NG-CDF Draft", type="primary"):
-            with st.spinner("Gemma 4 is drafting the funding proposal..."):
-                draft = gc.generate_cdf_draft(subset)
-            st.text_area("Draft proposal", draft, height=400)
-            st.download_button("Download draft (.txt)", draft, file_name=f"CDF_Draft_{chosen_ward}.txt")
-            st.markdown("#### Mark a complaint resolved")
-        open_complaints = df[df["status"] == "Open"]
-
-        if open_complaints.empty:
-            st.info("No open complaints to resolve.")
+        if df.empty:
+            st.info("No reports yet.")
         else:
-            options = {
-                f"{row['category']} — {row['ward']} ({row['english_summary'][:50]}...)": row["id"]
-                for _, row in open_complaints.iterrows()
-            }
-            chosen_label = st.selectbox("Select complaint to resolve", list(options.keys()))
-            chosen_id = options[chosen_label]
-
-            resolution_note = st.text_area(
-                "What was done to resolve it? (required)",
-                placeholder="e.g. County crew filled potholes and regraded the road on 22 July.",
+            st.markdown("#### Gap detector — clusters by ward & category")
+            cluster = (
+                df.groupby(["ward", "category"])
+                .agg(count=("category", "size"), max_days_unresolved=("days_unresolved", "max"))
+                .reset_index()
+                .sort_values(by=["count", "max_days_unresolved"], ascending=False)
             )
-            resolution_photo = st.file_uploader("Attach after-photo (recommended)", type=["jpg", "jpeg", "png"])
-            resolved_by = st.text_input("Your name (required — for accountability sign-off)")
-            resolved_date = st.date_input("Date resolved")
+            st.dataframe(cluster, use_container_width=True, hide_index=True)
 
-            if st.button("✅ Mark Resolved", type="primary"):
-                if not resolution_note.strip():
-                    st.warning("Please describe what was done before marking this resolved.")
-                elif not resolved_by.strip():
-                    st.warning("Please enter your name to sign off on this resolution.")
-                else:
-                    photo_path = ""
-                    if resolution_photo is not None:
-                        photo_path = os.path.join("data", f"resolved_{chosen_id}.jpg")
-                        with open(photo_path, "wb") as f:
-                            f.write(resolution_photo.getbuffer())
-                    resolved_row = ds.mark_resolved(
-                        chosen_id, resolution_note.strip(), resolved_by.strip(),
-                        photo_path, resolved_date.strftime("%Y-%m-%d"),
-                    )
-                    sms_sent = sms.send_resolution_alert(
-                        resolved_row.get("phone", ""),
-                        resolved_row["category"],
-                        resolved_row["ward"],
-                    )
-                    if resolved_row.get("phone"):
-                        if sms_sent:
-                            st.success(f"Marked resolved by {resolved_by.strip()} on {resolved_row['resolved_date']}. SMS alert sent.")
-                        else:
-                            st.success(f"Marked resolved by {resolved_by.strip()} on {resolved_row['resolved_date']}. (SMS mocked — check terminal.)")
+            st.markdown("#### One-click CDF Draft Generator")
+            wards = sorted(df["ward"].dropna().unique().tolist())
+            chosen_ward = st.selectbox("Select ward cluster to draft a proposal for", wards)
+
+            subset = df[df["ward"] == chosen_ward]
+            st.write(f"{len(subset)} complaint(s) will be used as evidence for this draft.")
+
+            if st.button("📄 Generate NG-CDF Draft", type="primary"):
+                with st.spinner("Gemma 4 is drafting the funding proposal..."):
+                    draft = gc.generate_cdf_draft(subset)
+                st.text_area("Draft proposal", draft, height=400)
+                st.download_button("Download draft (.txt)", draft, file_name=f"CDF_Draft_{chosen_ward}.txt")
+
+            st.markdown("#### Mark a complaint resolved")
+            open_complaints = df[df["status"] == "Open"]
+
+            if open_complaints.empty:
+                st.info("No open complaints to resolve.")
+            else:
+                options = {
+                    f"{row['category']} — {row['ward']} ({row['english_summary'][:50]}...)": row["id"]
+                    for _, row in open_complaints.iterrows()
+                }
+                chosen_label = st.selectbox("Select complaint to resolve", list(options.keys()))
+                chosen_id = options[chosen_label]
+
+                resolution_note = st.text_area(
+                    "What was done to resolve it? (required)",
+                    placeholder="e.g. County crew filled potholes and regraded the road on 22 July.",
+                )
+                resolution_photo = st.file_uploader("Attach after-photo (recommended)", type=["jpg", "jpeg", "png"])
+                resolved_by = st.text_input("Your name (required — for accountability sign-off)")
+                resolved_date = st.date_input("Date resolved")
+
+                if st.button("✅ Mark Resolved", type="primary"):
+                    if not resolution_note.strip():
+                        st.warning("Please describe what was done before marking this resolved.")
+                    elif not resolved_by.strip():
+                        st.warning("Please enter your name to sign off on this resolution.")
                     else:
-                        st.success(f"Marked resolved by {resolved_by.strip()} on {resolved_row['resolved_date']}. No phone on file, no SMS sent.")
-                    st.rerun()
+                        photo_path = ""
+                        if resolution_photo is not None:
+                            photo_path = os.path.join("data", f"resolved_{chosen_id}.jpg")
+                            with open(photo_path, "wb") as f:
+                                f.write(resolution_photo.getbuffer())
+                        resolved_row = ds.mark_resolved(
+                            chosen_id, resolution_note.strip(), resolved_by.strip(),
+                            photo_path, resolved_date.strftime("%Y-%m-%d"),
+                        )
+                        sms_sent = sms.send_resolution_alert(
+                            resolved_row.get("phone", ""),
+                            resolved_row["category"],
+                            resolved_row["ward"],
+                        )
+                        if resolved_row.get("phone"):
+                            if sms_sent:
+                                st.success(f"Marked resolved by {resolved_by.strip()} on {resolved_row['resolved_date']}. SMS alert sent.")
+                            else:
+                                st.success(f"Marked resolved by {resolved_by.strip()} on {resolved_row['resolved_date']}. (SMS mocked — check terminal.)")
+                        else:
+                            st.success(f"Marked resolved by {resolved_by.strip()} on {resolved_row['resolved_date']}. No phone on file, no SMS sent.")
+                        st.rerun()
