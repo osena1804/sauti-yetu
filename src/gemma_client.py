@@ -124,6 +124,14 @@ def _rough_translate(text: str) -> str:
     words = text.split()
     translated = [_TRANSLATION_HINTS.get(w.strip(".,!").lower(), w) for w in words]
     return " ".join(translated)[:200]
+def _looks_degenerate(text: str) -> bool:
+    """Detects repetition-loop garbage output (e.g. 'lack of lack of lack...')."""
+    words = text.split()
+    if len(words) < 8:
+        return False
+    from collections import Counter
+    most_common_word, count = Counter(words).most_common(1)[0]
+    return count / len(words) > 0.3  # one word making up >30% of the text = degenerate
 
 
 def _mock_classify(raw_text: str) -> dict:
@@ -179,6 +187,8 @@ def classify_complaint(raw_text: str) -> dict:
                 tool_config=types.ToolConfig(
                     function_calling_config=types.FunctionCallingConfig(mode="ANY")
                 ),
+                temperature=0.2,
+                max_output_tokens=300,
             )
             response = client.models.generate_content(
                 model=GEMMA_MODEL,
@@ -187,6 +197,9 @@ def classify_complaint(raw_text: str) -> dict:
             )
             call = response.candidates[0].content.parts[0].function_call
             result = dict(call.args)
+            if _looks_degenerate(result.get("english_summary", "")):
+                print("[gemma_client] Detected degenerate output, falling back to mock")
+                result = None
         except Exception as e:
             print(f"[gemma_client] Live classify_complaint call failed, using mock: {e}")
             result = None
@@ -217,12 +230,14 @@ def classify_complaint_audio(audio_path: str) -> dict:
             types.FunctionDeclaration(**_STRUCTURE_COMPLAINT_SCHEMA)
         ])
         config = types.GenerateContentConfig(
-            system_instruction=SYSTEM_PROMPT,
-            tools=[tool],
-            tool_config=types.ToolConfig(
-                function_calling_config=types.FunctionCallingConfig(mode="ANY")
-            ),
-        )
+                system_instruction=SYSTEM_PROMPT,
+                tools=[tool],
+                tool_config=types.ToolConfig(
+                    function_calling_config=types.FunctionCallingConfig(mode="ANY")
+                ),
+                temperature=0.2,
+                max_output_tokens=300,
+            )
         response = client.models.generate_content(
             model=GEMMA_MODEL,
             contents=[uploaded],
@@ -230,6 +245,7 @@ def classify_complaint_audio(audio_path: str) -> dict:
         )
         call = response.candidates[0].content.parts[0].function_call
         result = dict(call.args)
+        
     except Exception as e:
         print(f"[gemma_client] Live audio classify failed, using mock: {e}")
         result = _mock_classify("[audio input -- fallback mock]")
@@ -262,17 +278,14 @@ def classify_complaint_image(image_path: str) -> dict:
             types.FunctionDeclaration(**_STRUCTURE_COMPLAINT_SCHEMA)
         ])
         config = types.GenerateContentConfig(
-            system_instruction=SYSTEM_PROMPT + (
-                "\n\nThe citizen has attached a photo instead of writing a description. "
-                "Look at the photo and infer the category, urgency, and a clear "
-                "english_summary describing what the photo shows. If no ward/location "
-                "is visible or inferable, use 'Unspecified'."
-            ),
-            tools=[tool],
-            tool_config=types.ToolConfig(
-                function_calling_config=types.FunctionCallingConfig(mode="ANY")
-            ),
-        )
+                system_instruction=SYSTEM_PROMPT,
+                tools=[tool],
+                tool_config=types.ToolConfig(
+                    function_calling_config=types.FunctionCallingConfig(mode="ANY")
+                ),
+                temperature=0.2,
+                max_output_tokens=300,
+            )
         response = client.models.generate_content(
             model=GEMMA_MODEL,
             contents=[uploaded],
